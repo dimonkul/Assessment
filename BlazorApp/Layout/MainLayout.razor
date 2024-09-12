@@ -1,0 +1,57 @@
+﻿@using System.Security.Claims
+@using BlazorApp.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using BlazorApp.Components
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject IAuthService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<CascadingValue Value="this">
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+    <main>
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <span>Hello, @context.User.FindFirst(ClaimTypes.Name)?.Value</span>
+                    <button class="btn btn-link" @onclick="Logout">Logout</button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="login">Login</a>
+                    <a href="register">Register</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+<LoadingIndicator @bind-IsVisible="@_isLoading" />
+</CascadingValue>
+
+@code
+{
+    private bool _isLoading;
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+    }
+
+    public void SetLoadingState(bool isLoading)
+    {
+        _isLoading = isLoading;
+        StateHasChanged();
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.Logout();
+        ((CustomAuthStateProvider)AuthStateProvider).NotifyUserLogout();
+        NavigationManager.NavigateTo("/");
+    }
+}

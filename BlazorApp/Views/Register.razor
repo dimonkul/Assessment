@@ -1,0 +1,213 @@
+﻿@page "/register"
+@using BlazorApp.Models
+@using BlazorApp.Services
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ILoggingService LoggingService
+
+<h3>Register</h3>
+
+<!-- Registration form -->
+<EditForm Model="@registerModel" OnValidSubmit="HandleRegistration">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <!-- Email input field -->
+    <div class="form-group">
+        <label for="email">Email:</label>
+        <InputText id="email" @bind-Value="registerModel.Email" class="form-control" />
+        <ValidationMessage For="@(() => registerModel.Email)" />
+    </div>
+
+    <!-- Password input field with strength indicator -->
+    <div class="form-group">
+        <label for="password">Password:</label>
+        <InputText type="password" id="password" @bind-Value="registerModel.Password" @oninput="CheckPasswordStrength" class="form-control" />
+        <div class="progress mt-2">
+            <div class="progress-bar @passwordStrengthColor" role="progressbar"
+                 style="width: @(passwordStrength)%;"
+                 aria-valuenow="@passwordStrength" aria-valuemin="0" aria-valuemax="100">
+                @passwordStrengthText
+            </div>
+        </div>
+        <ValidationMessage For="@(() => registerModel.Password)" />
+    </div>
+
+    <!-- Confirm password input field with strength indicator -->
+    <div class="form-group">
+        <label for="confirmPassword">Confirm Password:</label>
+        <InputText type="password" id="password" @bind-Value="registerModel.ConfirmPassword" @oninput="CheckPasswordStrength" class="form-control" />
+        <div class="progress mt-2">
+            <div class="progress-bar @passwordStrengthColor" role="progressbar"
+                 style="width: @(passwordStrength)%;"
+                 aria-valuenow="@passwordStrength" aria-valuemin="0" aria-valuemax="100">
+                @passwordStrengthText
+            </div>
+        </div>
+        <small class="form-text text-muted">Password must be at least @MIN_PASSWORD_LENGTH characters long and include a mix of uppercase, lowercase, numbers, and special characters.</small>
+        <ValidationMessage For="@(() => registerModel.ConfirmPassword)" />
+    </div>
+
+    <!-- Submit button with loading indicator -->
+    <button type="submit" class="btn btn-primary mt-3" disabled="@isRegistering">
+        @if (isRegistering)
+        {
+            <span class="spinner-border spinner-border-sm mr-1"></span>
+        }
+        Register
+    </button>
+</EditForm>
+
+<!-- Error message display -->
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger mt-3">@error</div>
+}
+
+@code
+{
+    private RegisterModel registerModel = new();
+    private string? error;
+    private bool isRegistering;
+
+    // Constants for password strength calculation
+    private const int MIN_PASSWORD_LENGTH = 8;
+    private const int WEAK_THRESHOLD = 30;
+    private const int MEDIUM_THRESHOLD = 60;
+    private const int STRONG_THRESHOLD = 80;
+
+    // Password strength indicator variables
+    private int passwordStrength = 0;
+    private string passwordStrengthText = "";
+    private string passwordStrengthColor = "";
+
+    /// <summary>
+    /// Checks the strength of the password and updates the strength indicator.
+    /// </summary>
+    private void CheckPasswordStrength(ChangeEventArgs e)
+    {
+        var password = e.Value?.ToString() ?? string.Empty;
+        passwordStrength = CalculatePasswordStrength(password);
+
+        // Determine password strength text and color based on the calculated strength
+        switch (passwordStrength)
+        {
+            case < WEAK_THRESHOLD:
+                passwordStrengthText = "Weak";
+                passwordStrengthColor = "bg-danger";
+                break;
+            case < MEDIUM_THRESHOLD:
+                passwordStrengthText = "Medium";
+                passwordStrengthColor = "bg-warning";
+                break;
+            case < STRONG_THRESHOLD:
+                passwordStrengthText = "Strong";
+                passwordStrengthColor = "bg-info";
+                break;
+            default:
+                passwordStrengthText = "Very Strong";
+                passwordStrengthColor = "bg-success";
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Calculates the strength of the password based on various criteria.
+    /// </summary>
+    private int CalculatePasswordStrength(string password)
+    {
+        var score = 0;
+
+        if (string.IsNullOrWhiteSpace(password))
+            return score;
+
+        // Length check
+        if (password.Length >= MIN_PASSWORD_LENGTH)
+            score += 10;
+        score += password.Length * 2; 
+
+        // Complexity checks
+        if (password.Any(char.IsLower))
+            score += 10;
+        if (password.Any(char.IsUpper))
+            score += 10;
+        if (password.Any(char.IsDigit))
+            score += 10;
+        if (password.Any(ch => !char.IsLetterOrDigit(ch)))
+            score += 10;
+
+        // Variety check
+        var uniqueChars = new HashSet<char>(password).Count;
+        score += uniqueChars * 2;
+
+        return Math.Min(score, 100); 
+    }
+
+    /// <summary>
+    /// Handles the registration process when the form is submitted.
+    /// </summary>
+    private async Task HandleRegistration()
+    {
+        try
+        {
+            this.isRegistering = true;
+            this.error = null;
+
+            if (!this.ValidatePasswords())
+            {
+                return;
+            }
+
+            var result = await this.AuthService.Register(registerModel);
+            if (result)
+            {
+                this.LoggingService.LogInformation($"User {registerModel.Email} registered successfully");
+                this.NavigateToLogin();
+            }
+            else
+            {
+                this.SetErrorMessage("Registration failed. Please try again.");
+                this.LoggingService.LogWarning($"Registration failed for user {registerModel.Email}");
+            }
+        }
+        catch (Exception ex)
+        {
+            this.SetErrorMessage("An unexpected error occurred. Please try again.");
+            this.LoggingService.LogError($"Registration error for user {registerModel.Email}", ex);
+        }
+        finally
+        {
+            this.isRegistering = false;
+        }
+    }
+
+    /// <summary>
+    /// Validates that the password and confirm password match.
+    /// </summary>
+    private bool ValidatePasswords()
+    {
+        if (this.registerModel.Password != this.registerModel.ConfirmPassword)
+        {
+            this.SetErrorMessage("Passwords do not match");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Navigates to the login page.
+    /// </summary>
+    private void NavigateToLogin()
+    {
+        this.NavigationManager.NavigateTo("/login");
+    }
+
+    /// <summary>
+    /// Sets the error message and triggers a UI update.
+    /// </summary>
+    private void SetErrorMessage(string message)
+    {
+        this.error = message;
+        this.StateHasChanged();
+    }
+}

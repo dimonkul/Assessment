@@ -1,0 +1,20 @@
+﻿@inherits ErrorBoundaryBase
+
+@code
+{
+    private Exception? CurrentError;
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        CurrentError = exception;
+        return Task.CompletedTask;
+    }
+}
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <h3>An error occurred: @CurrentError?.Message</h3>
+}

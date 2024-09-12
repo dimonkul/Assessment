@@ -1,0 +1,165 @@
+﻿@* @page "/login"
+@using BlazorApp.Models
+@using BlazorApp.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILoggingService LoggingService
+
+<h3>Login</h3>
+
+<EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="email">Email:</label>
+        <InputText id="email" @bind-Value="loginModel.Email" class="form-control" />
+        <ValidationMessage For="@(() => loginModel.Email)" />
+    </div>
+
+    <div class="form-group">
+        <label for="password">Password:</label>
+        <InputText type="password" id="password" @bind-Value="loginModel.Password" class="form-control" />
+        <ValidationMessage For="@(() => loginModel.Password)" />
+    </div>
+
+    <button style="margin-top: 20px;" type="submit" class="btn btn-primary">Login</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger mt-3">@error</div>
+}
+
+@code
+{
+    private LoginModel loginModel = new();
+    private string? error;
+
+    private async Task HandleLogin()
+    {
+        error = null;
+        var result = await AuthService.Login(loginModel);
+        if (result)
+        {
+            LoggingService.LogInformation($"User {loginModel.Email} logged in successfully");
+            ((CustomAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(await AuthService.GetToken());
+            NavigationManager.NavigateTo("/webapi");
+        }
+        else
+        {
+            error = "Invalid username or password";
+            LoggingService.LogWarning($"Failed login attempt for user {loginModel.Email}");
+        }
+    }
+} *@
+
+@page "/login"
+@using BlazorApp.Models
+@using BlazorApp.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILoggingService LoggingService
+
+<h3>Login</h3>
+
+<EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="email">Email:</label>
+        <InputText id="email" @bind-Value="loginModel.Email" class="form-control" />
+        <ValidationMessage For="@(() => loginModel.Email)" />
+    </div>
+
+    <div class="form-group">
+        <label for="password">Password:</label>
+        <InputText type="password" id="password" @bind-Value="loginModel.Password" class="form-control" />
+        <ValidationMessage For="@(() => loginModel.Password)" />
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-3" disabled="@isLoading">
+        @if (isLoading)
+        {
+            <span class="spinner-border spinner-border-sm mr-1"></span>
+        }
+        Login
+    </button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger mt-3">@error</div>
+}
+
+@code {
+    private LoginModel loginModel = new();
+    private string? error;
+    private bool isLoading = false;
+
+    /// <summary>
+    /// Handles the login process when the form is submitted.
+    /// </summary>
+    private async Task HandleLogin()
+    {
+        try
+        {
+            isLoading = true;
+            error = null;
+
+            var result = await AuthService.Login(loginModel);
+            if (result)
+            {
+                LoggingService.LogInformation($"User {loginModel.Email} logged in successfully");
+                await NotifyAuthenticationStateChanged();
+                NavigateToWebApi();
+            }
+            else
+            {
+                SetErrorMessage("Invalid username or password");
+                LoggingService.LogWarning($"Failed login attempt for user {loginModel.Email}");
+            }
+        }
+        catch (Exception ex)
+        {
+            SetErrorMessage("An unexpected error occurred. Please try again.");
+            LoggingService.LogError($"Login error for user {loginModel.Email}", ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Notifies that the authentication state has changed.
+    /// </summary>
+    private async Task NotifyAuthenticationStateChanged()
+    {
+        var token = await AuthService.GetToken();
+        ((CustomAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(token);
+    }
+
+    /// <summary>
+    /// Navigates to the WebAPI page.
+    /// </summary>
+    private void NavigateToWebApi()
+    {
+        NavigationManager.NavigateTo("/webapi");
+    }
+
+    /// <summary>
+    /// Sets the error message.
+    /// </summary>
+    private void SetErrorMessage(string message)
+    {
+        error = message;
+        StateHasChanged();
+    }
+}

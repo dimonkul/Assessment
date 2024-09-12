@@ -1,0 +1,76 @@
+﻿@page "/webapi"
+@inject HttpClient Http
+@inject WebApiViewModel ViewModel
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using BlazorApp.ViewModels
+@using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
+
+<PageTitle>Assessment</PageTitle>
+<h1>Test Page</h1>
+
+@* Conditional rendering based on authentication state *@
+@if (isAuthenticated.HasValue && !isAuthenticated.Value)
+{
+    <p>Please log in to view this page.</p>
+    <a href="login">Login</a>
+}
+else
+{
+    <p role="status">Press button to view the result of calling WebAPI that invokes 2 other WebAPIs.</p>
+    <pre role="article">@ViewModel.Result</pre>
+    <button class="btn btn-primary" @onclick="SendRequest">Send request</button>
+}
+
+@code {
+    // Cascading parameter to access the MainLayout
+    [CascadingParameter]
+    public MainLayout Layout { get; set; }
+
+    // authentication state
+    private bool? isAuthenticated;
+
+    /// <summary>
+    /// Initializes the component and checks authentication state.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the current authentication state
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        this.isAuthenticated = authState?.User?.Identity?.IsAuthenticated;
+
+        // If authenticated, subscribe to ViewModel property changes
+        if (this.isAuthenticated.HasValue && this.isAuthenticated.Value)
+        {
+            this.ViewModel.PropertyChanged += (_, _) => this.StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Sends a request to the WebAPI and updates the ViewModel.
+    /// </summary>
+    private async Task SendRequest()
+    {
+        try
+        {
+            // Set loading state in the MainLayout
+            this.Layout?.SetLoadingState(true);
+            // Send request to WebAPI via ViewModel
+            await this.ViewModel.SendRequestToWebApi();
+        }
+        finally
+        {
+            // Reset loading state
+            this.Layout?.SetLoadingState(false);
+        }
+    }
+
+    /// <summary>
+    /// Implements IDisposable to unsubscribe from ViewModel events.
+    /// </summary>
+    public void Dispose()
+    {
+        // Unsubscribe from ViewModel property changes to prevent memory leaks
+        this.ViewModel.PropertyChanged -= (_, _) => this.StateHasChanged();
+    }
+}

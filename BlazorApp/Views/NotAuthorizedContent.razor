@@ -1,0 +1,25 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager NavigationManager
+
+<AuthenticationState>
+    @if (context.User.Identity?.IsAuthenticated != true)
+    {
+        <text>You need to <a href="login?returnUrl=@Uri.EscapeDataString(NavigationManager.Uri)">log in</a> to access this resource.</text>
+    }
+    else
+    {
+        <p>You are not authorized to access this resource.</p>
+    }
+</AuthenticationState>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    private AuthenticationState context;
+
+    protected override async Task OnInitializedAsync()
+    {
+        context = await AuthenticationStateTask;
+    }
+}
